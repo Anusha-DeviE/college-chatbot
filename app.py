@@ -1,8 +1,8 @@
 from flask import Flask, request, jsonify
 from sentence_transformers import SentenceTransformer, util
-from transformers import pipeline
 import pandas as pd
 import torch
+import os
 
 app = Flask(__name__)
 
@@ -10,12 +10,12 @@ app = Flask(__name__)
 df = pd.read_csv("college_qa_dataset.csv", encoding='latin1')
 df.columns = df.columns.str.strip().str.lower()
 
-# Load models once
+# Load embedding model
 model_embed = SentenceTransformer('all-MiniLM-L6-v2')
 faq_embeddings = model_embed.encode(df['input'].tolist(), convert_to_tensor=True)
-gen_pipeline = pipeline("text2text-generation", model="google/flan-t5-base")
 
-THRESHOLD = 0.6  # confidence threshold
+# Define similarity threshold
+THRESHOLD = 0.6
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -30,8 +30,7 @@ def webhook():
         if best_score >= THRESHOLD:
             response = matched_answer
         else:
-            prompt = f"Answer like a helpful college counselor: {user_input}"
-            response = gen_pipeline(prompt, max_new_tokens=100)[0]['generated_text']
+            response = "Sorry, I don't know that. Please contact the admissions office."
 
         return jsonify({"fulfillmentText": response.strip()})
 
@@ -39,8 +38,5 @@ def webhook():
         return jsonify({"fulfillmentText": f"Error: {str(e)}"})
 
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
-            
